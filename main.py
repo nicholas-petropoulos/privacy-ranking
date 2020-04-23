@@ -1,4 +1,6 @@
 import json
+from _csv import writer
+from time import sleep
 from urllib.parse import urlparse
 
 from browsermobproxy import Server
@@ -8,7 +10,7 @@ from selenium import webdriver
 # Purpose of this script: List all resources (URLs) that
 # Chrome downloads when visiting some page.
 
-full_url = "https://msn.com"
+full_url = "https://yahoo.com"
 # used to filter out false positive external sites with subdomains
 domain = full_url[8:]
 chromedriver_location = "" # Path containing the chromedriver
@@ -42,9 +44,9 @@ soup = BeautifulSoup(driver.page_source, features="html.parser")
 internal = []
 others_https = []
 others_http = []
-ext_images = []
-ext_videos = []
+ext_img_vid = []
 ext_js = []
+ad_tracker_matches = []
 redirects = []
 
 # make sure to set ext. lower() when parsing
@@ -70,8 +72,8 @@ for link in soup.findAll('a'):
         others_http.append(link.get('href'))
 
 # Load tracker and ad lists
-with open('lists/trackers.json') as f:
-    tracker_list = str(json.load(f))
+# with open('lists/trackers.json') as f:
+#     tracker_list = str(json.load(f))
 
 ad_list = []
 # read ads_trackers.txt - add to array, strip newline
@@ -80,52 +82,61 @@ with open('lists/ads_trackers.txt') as f:
 for line in ad_list_file:
     ad_list.append(line.strip())
 
+sleep(20)
+print('Waiting 20s for full page load to collect ads/trackers...')
 # Print all URLs/resources that were requested - external
 # links_file = open(f'sites\{domain}.txt', 'w')
+
 entries = proxy.har['log']["entries"]
 for entry in entries:
     if 'request' in entry.keys():
         full_url = entry['request']['url']
         base_url = urlparse(full_url).netloc
         # combined url
-        new_url = None
-        try:
-            new_url = base_url.split('.')[1] + '.' + base_url.split('.')[2]
-        except IndexError:
-            pass
+        # try:
+        #     new_url = base_url.split('.')[1] + '.' + base_url.split('.')[2]
+        # except IndexError:
+        #     new_url = base_url
         # check for image extensions
-        if any(ext in full_url for ext in img_types):
-            pass
-        elif any(ext in full_url for ext in vid_types):
-            pass
+        if any(ext in full_url for ext in img_types) or any(ext in full_url for ext in vid_types):
+            ext_img_vid.append(full_url)
         elif 'js' in full_url:
-            pass
-        # ads?
-        # (base_url.split('.')[1] in tracker_list)
-        elif new_url is not None and new_url in ad_list:
+            ext_js.append(full_url)
+        # ads & trackers
+        elif base_url in ad_list:
             # print(f'match: {base_url}')
             # print(f'NEW URL: {new_url}')
-            pass
+            ad_tracker_matches.append(base_url)
         # print(entry['request']['url'])
         # links_file.write(f"\n{entry['request']['url']}")
+# remove dupes
+ad_tracker_matches = list(dict.fromkeys(ad_tracker_matches))
+print(f'AD Matches: {len(ad_tracker_matches)} - {ad_tracker_matches}')
 
+ext_img_vid = list(dict.fromkeys(ext_img_vid))
+print(f'Num ext. img/vid: {len(ext_img_vid)} - {ext_img_vid}')
 
+ext_js = list(dict.fromkeys(ext_js))
+print(f'Num ext. js: {len(ext_js)} - {ext_js}')
 
-# print('Num Internal Links: ' + str(len(internal)))
-# for link in internal:
-#     pass
-#     #print(link)
-#
-# print('Num External https: ' + str(len(others_https)))
-# for link in others_https:
-#     print(link)
-#
-# print('Num External http: ' + str(len(others_http)))
-# for link in others_http:
-#     print(link)
+print(f'Num Internal Links: {(len(internal))}')
+
+others_https = list(dict.fromkeys(others_https))
+print(f'Num External https: {(len(others_https))}')
+
+others_http = list(dict.fromkeys(others_http))
+print(f'Num External http: {(len(others_http))}')
 
 # TODO: save to CSV for each site
-# TODO: site, num_internal, num_external, num_http, num_redirects, num_ext_js, num_ext_img_vid, num_ad_sites
+# TODO: site,num_internal,num_external,num_http,num_ad_trackers,num_ext_js,num_ext_img_vid,num_redirects
+csv_row = [domain, len(internal), len(others_https), len(others_http), len(ad_tracker_matches), len(ext_js),
+           len(ext_img_vid), len(redirects)]
+
+with open('stats.csv', 'a+', newline='') as write_obj:
+    # Create a writer object from csv module
+    csv_writer = writer(write_obj)
+    # Add contents of list as last row in the csv file
+    csv_writer.writerow(csv_row)
 
 server.stop()
 driver.quit()
