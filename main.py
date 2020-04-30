@@ -7,8 +7,8 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 
 # Init CSV
-with open('stats.csv', 'w', newline='') as f:
-    f.write('site,num_internal,num_external,num_http,num_ad_trackers,num_ext_js,num_ext_img_vid,num_redirects\n')
+with open('stats.csv', 'w', newline='') as f:  # num_redirects
+    f.write('site,num_internal,num_external,num_http,num_ad_trackers,num_ext_js,num_ext_img_vid\n')
 
 with open('top_sites.txt', 'r') as f:
     lines = f.readlines()
@@ -93,7 +93,7 @@ for site in sites:
         ad_list.append(line.strip())
 
     print('Waiting 20s for full page load to collect ads/trackers...')
-    sleep(2)
+    sleep(120)
     # Print all URLs/resources that were requested - external
     # links_file = open(f'sites\{domain}.txt', 'w')
 
